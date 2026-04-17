@@ -3,205 +3,820 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Spanish Flashcards</title>
+<title>Spanish Question Flashcards</title>
 <style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --bg: #0f0f1a;
+    --surface: #1a1a2e;
+    --surface2: #222240;
+    --accent: #e94560;
+    --accent2: #e2a914;
+    --accent3: #4ecdc4;
+    --text: #e8e8f0;
+    --text-dim: #8888aa;
+    --correct: #4ecdc4;
+    --wrong: #ff6b6b;
+    --radius: 12px;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
   body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background: #1a1a2e;
-    color: #eee;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
     min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 20px;
+    overflow-x: hidden;
   }
-  h1 { margin-bottom: 10px; font-size: 1.6rem; color: #e94560; }
-  .progress { margin-bottom: 20px; font-size: 0.95rem; color: #aaa; }
-  .card-container {
-    perspective: 800px;
-    width: 100%;
-    max-width: 560px;
-    height: 280px;
-    cursor: pointer;
-    margin-bottom: 24px;
+
+  /* NAV */
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(15,15,26,0.95);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid rgba(233,69,96,0.2);
+    padding: 0 24px;
+    display: flex; align-items: center; gap: 8px;
+    height: 60px;
   }
-  .card {
-    width: 100%;
-    height: 100%;
+  nav .logo {
+    font-weight: 800; font-size: 1.1rem; color: var(--accent);
+    margin-right: 24px; white-space: nowrap;
+  }
+  nav button {
+    background: none; border: none; color: var(--text-dim);
+    font-size: 0.9rem; padding: 8px 16px; cursor: pointer;
+    border-radius: 8px; transition: all 0.2s;
+    font-weight: 600;
+  }
+  nav button:hover { color: var(--text); background: var(--surface2); }
+  nav button.active { color: var(--accent); background: var(--surface); }
+  .score-display {
+    margin-left: auto;
+    font-size: 0.85rem; color: var(--text-dim);
+    display: flex; align-items: center; gap: 12px;
+  }
+  .score-display .streak { color: var(--accent); font-weight: 700; }
+  .progress-ring { width: 36px; height: 36px; }
+  .progress-ring circle { fill: none; stroke-width: 3; }
+  .progress-ring .bg { stroke: var(--surface2); }
+  .progress-ring .fg { stroke: var(--accent); stroke-linecap: round; transition: stroke-dashoffset 0.5s; }
+
+  /* SECTIONS */
+  .section { display: none; padding: 32px 24px; max-width: 960px; margin: 0 auto; }
+  .section.active { display: block; }
+  .section h2 {
+    font-size: 1.6rem; margin-bottom: 8px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .section .subtitle { color: var(--text-dim); margin-bottom: 24px; font-size: 0.95rem; }
+
+  /* FLASHCARD DECK */
+  .deck-container {
     position: relative;
-    transform-style: preserve-3d;
-    transition: transform 0.5s;
+    width: 100%; max-width: 600px; margin: 0 auto 24px;
+    height: 360px;
+    perspective: 1200px;
   }
-  .card.flipped { transform: rotateY(180deg); }
-  .card-face {
-    position: absolute;
-    width: 100%;
-    height: 100%;
-    backface-visibility: hidden;
-    border-radius: 16px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 30px;
-    text-align: center;
-    font-size: 1.35rem;
-    line-height: 1.5;
-  }
-  .card-front {
-    background: linear-gradient(135deg, #16213e, #0f3460);
-    border: 2px solid #e94560;
-  }
-  .card-back {
-    background: linear-gradient(135deg, #0f3460, #533483);
-    border: 2px solid #e94560;
-    transform: rotateY(180deg);
-  }
-  .card-label {
-    font-size: 0.75rem;
-    text-transform: uppercase;
-    letter-spacing: 2px;
-    color: #e94560;
-    margin-bottom: 12px;
-  }
-  .hint { font-size: 0.8rem; color: #888; margin-top: 14px; }
-  .controls {
-    display: flex;
-    gap: 14px;
-    flex-wrap: wrap;
-    justify-content: center;
-  }
-  button {
-    padding: 10px 24px;
-    border: none;
-    border-radius: 8px;
-    font-size: 1rem;
+  .deck-card {
+    position: absolute; inset: 0;
     cursor: pointer;
-    transition: background 0.2s;
+    transform-style: preserve-3d;
+    transition: transform 0.5s ease, opacity 0.5s ease, top 0.4s ease, left 0.4s ease, box-shadow 0.3s ease;
+    border-radius: var(--radius);
+  }
+  .deck-card[data-depth="0"] { z-index: 10; top: 0; left: 0; filter: none; }
+  .deck-card[data-depth="1"] { z-index: 9; top: 12px; left: 0; opacity: 0.85; pointer-events: none; transform: scale(0.96); filter: brightness(0.7); }
+  .deck-card[data-depth="2"] { z-index: 8; top: 24px; left: 0; opacity: 0.65; pointer-events: none; transform: scale(0.92); filter: brightness(0.5); }
+  .deck-card[data-depth="3"] { z-index: 7; top: 36px; left: 0; opacity: 0.45; pointer-events: none; transform: scale(0.88); filter: brightness(0.35); }
+  .deck-card[data-depth="hidden"] { z-index: 1; top: 0; left: 0; opacity: 0; pointer-events: none; }
+
+  .deck-card .card-inner {
+    position: relative; width: 100%; height: 100%;
+    transform-style: preserve-3d;
+    transition: transform 0.5s ease;
+  }
+  .deck-card.flipped .card-inner { transform: rotateY(180deg); }
+
+  .deck-card[data-depth="0"] .card-face {
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5), 0 0 0 1px rgba(233,69,96,0.2);
+  }
+  .deck-card .card-face {
+    position: absolute; inset: 0;
+    backface-visibility: hidden;
+    background: var(--surface);
+    border: 1px solid rgba(233,69,96,0.15);
+    border-radius: var(--radius);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    padding: 32px; text-align: center;
+    overflow-y: auto;
+  }
+  .deck-card .card-back { transform: rotateY(180deg); }
+  .deck-card .card-face .label {
+    font-size: 0.75rem; text-transform: uppercase; letter-spacing: 2px;
+    color: var(--accent); margin-bottom: 16px;
+  }
+  .deck-card .card-face .term { font-size: 1.4rem; font-weight: 700; line-height: 1.4; }
+  .deck-card .card-face .definition { font-size: 1.05rem; line-height: 1.6; color: var(--text-dim); }
+
+  .deck-card.swipe-left {
+    transform: translateX(-140%) rotate(-18deg) !important;
+    opacity: 0 !important;
+    transition: transform 0.45s ease-in, opacity 0.45s ease-in !important;
+  }
+  .deck-card.swipe-right {
+    transform: translateX(140%) rotate(18deg) !important;
+    opacity: 0 !important;
+    transition: transform 0.45s ease-in, opacity 0.45s ease-in !important;
+  }
+  .deck-card.arriving {
+    transition: top 0.35s ease-out, left 0.35s ease-out, opacity 0.35s ease-out !important;
+  }
+
+  .flashcard-controls {
+    display: flex; gap: 12px; justify-content: center; align-items: center; flex-wrap: wrap;
+  }
+  .flashcard-controls button {
+    padding: 10px 24px; border: none; border-radius: 8px;
+    font-size: 0.9rem; font-weight: 600; cursor: pointer; transition: all 0.2s;
   }
   .btn-prev, .btn-next {
-    background: #e94560;
-    color: #fff;
+    background: var(--surface2); color: var(--text);
   }
-  .btn-prev:hover, .btn-next:hover { background: #c73652; }
-  .btn-shuffle { background: #533483; color: #fff; }
-  .btn-shuffle:hover { background: #6c44a2; }
-  .btn-flip { background: #0f3460; color: #fff; border: 1px solid #e94560; }
-  .btn-flip:hover { background: #16213e; }
-  @media (max-width: 600px) {
-    .card-container { height: 240px; }
-    .card-face { font-size: 1.1rem; padding: 20px; }
+  .btn-prev:hover, .btn-next:hover { background: var(--accent); color: var(--bg); }
+  .btn-shuffle { background: var(--surface); color: var(--accent); border: 1px solid var(--accent) !important; }
+  .btn-shuffle:hover { background: var(--accent); color: var(--bg); }
+  .card-counter { color: var(--text-dim); font-size: 0.9rem; min-width: 80px; text-align: center; }
+  .flip-hint { color: var(--text-dim); font-size: 0.8rem; margin-top: 8px; text-align: center; }
+
+  /* CATEGORY FILTER */
+  .filter-bar {
+    display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap;
+  }
+  .filter-bar button {
+    padding: 6px 14px; border-radius: 20px; font-size: 0.8rem;
+    border: 1px solid var(--surface2); background: var(--surface);
+    color: var(--text-dim); cursor: pointer; transition: all 0.2s; font-weight: 600;
+  }
+  .filter-bar button.active { border-color: var(--accent); color: var(--accent); background: rgba(233,69,96,0.1); }
+
+  /* BROWSE LIST */
+  .browse-list { display: flex; flex-direction: column; gap: 8px; }
+  .browse-item {
+    background: var(--surface); border-radius: var(--radius);
+    border: 1px solid rgba(255,255,255,0.05);
+    overflow: hidden; transition: all 0.2s;
+  }
+  .browse-item:hover { border-color: rgba(233,69,96,0.3); }
+  .browse-header {
+    padding: 16px 20px; cursor: pointer;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .browse-header .term-name { font-weight: 700; font-size: 1rem; }
+  .browse-header .tag {
+    font-size: 0.7rem; padding: 3px 10px; border-radius: 12px;
+    background: rgba(233,69,96,0.15); color: var(--accent);
+    text-transform: uppercase; letter-spacing: 1px;
+  }
+  .browse-header .arrow {
+    color: var(--text-dim); transition: transform 0.2s; font-size: 1.2rem;
+  }
+  .browse-item.open .arrow { transform: rotate(90deg); }
+  .browse-body {
+    max-height: 0; overflow: hidden; transition: max-height 0.3s ease;
+  }
+  .browse-item.open .browse-body { max-height: 500px; }
+  .browse-body-inner {
+    padding: 0 20px 16px;
+    color: var(--text-dim); line-height: 1.7; font-size: 0.95rem;
+  }
+
+  /* TEST MODE */
+  .test-header {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 24px; flex-wrap: wrap; gap: 12px;
+  }
+  .test-score {
+    font-size: 1.1rem; font-weight: 700;
+    display: flex; gap: 20px; align-items: center;
+  }
+  .test-score .correct-count { color: var(--correct); }
+  .test-score .wrong-count { color: var(--wrong); }
+  .test-actions { display: flex; gap: 8px; }
+  .test-actions button {
+    padding: 8px 20px; border: none; border-radius: 8px;
+    font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: all 0.2s;
+  }
+  .btn-new-test { background: var(--accent); color: #fff; }
+  .btn-new-test:hover { filter: brightness(1.15); }
+  .btn-check-all { background: var(--surface2); color: var(--text); }
+  .btn-check-all:hover { background: var(--accent3); color: var(--bg); }
+
+  .test-question {
+    background: var(--surface); border-radius: var(--radius);
+    border: 1px solid rgba(255,255,255,0.05);
+    padding: 20px 24px; margin-bottom: 16px;
+    transition: border-color 0.3s;
+  }
+  .test-question.answered-correct { border-color: var(--correct); }
+  .test-question.answered-wrong { border-color: var(--wrong); }
+  .test-question .q-num {
+    font-size: 0.75rem; color: var(--accent); font-weight: 700;
+    text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;
+  }
+  .test-question .q-type {
+    display: inline-block; font-size: 0.65rem; padding: 2px 8px; border-radius: 10px;
+    background: var(--surface2); color: var(--text-dim); margin-left: 8px;
+    text-transform: uppercase; letter-spacing: 1px;
+  }
+  .test-question .q-text {
+    font-size: 1.05rem; line-height: 1.6; margin-bottom: 12px;
+  }
+  .test-question input[type="text"] {
+    width: 100%; padding: 10px 14px;
+    background: var(--surface2); border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 8px; color: var(--text); font-size: 0.95rem;
+    outline: none; transition: border-color 0.2s;
+  }
+  .test-question input[type="text"]:focus { border-color: var(--accent); }
+  .test-question input.correct { border-color: var(--correct); background: rgba(78,205,196,0.1); }
+  .test-question input.wrong { border-color: var(--wrong); background: rgba(255,107,107,0.1); }
+  .test-question .feedback {
+    margin-top: 8px; font-size: 0.85rem; display: none;
+  }
+  .test-question .feedback.show { display: block; }
+  .test-question .feedback.correct-fb { color: var(--correct); }
+  .test-question .feedback.wrong-fb { color: var(--wrong); }
+  .test-question .check-btn {
+    margin-top: 10px; padding: 6px 16px; border: none; border-radius: 6px;
+    background: var(--accent); color: #fff; font-weight: 600;
+    font-size: 0.85rem; cursor: pointer; transition: all 0.2s;
+  }
+  .test-question .check-btn:hover { filter: brightness(1.15); }
+  .test-question .check-btn:disabled { opacity: 0.4; cursor: default; }
+
+  /* MATCHING */
+  .matching-container {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 24px;
+    margin-bottom: 24px;
+  }
+  .matching-col h3 {
+    font-size: 0.8rem; text-transform: uppercase; letter-spacing: 2px;
+    color: var(--text-dim); margin-bottom: 12px;
+  }
+  .match-item {
+    padding: 12px 16px; margin-bottom: 8px;
+    background: var(--surface); border-radius: 8px;
+    border: 2px solid transparent; cursor: pointer;
+    transition: all 0.2s; font-size: 0.9rem;
+  }
+  .match-item:hover { border-color: rgba(233,69,96,0.3); }
+  .match-item.selected { border-color: var(--accent); background: rgba(233,69,96,0.1); }
+  .match-item.matched-correct {
+    border-color: var(--correct); background: rgba(78,205,196,0.1);
+    opacity: 0.6; pointer-events: none;
+  }
+  .match-item.matched-wrong {
+    border-color: var(--wrong); background: rgba(255,107,107,0.1);
+  }
+
+  /* RESULTS MODAL */
+  .results-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.7); z-index: 200;
+    align-items: center; justify-content: center;
+  }
+  .results-overlay.show { display: flex; }
+  .results-card {
+    background: var(--surface); border-radius: 16px;
+    padding: 40px; text-align: center; max-width: 400px;
+    border: 1px solid rgba(233,69,96,0.2);
+  }
+  .results-card .big-score {
+    font-size: 3rem; font-weight: 800; color: var(--accent); margin: 16px 0;
+  }
+  .results-card .grade-msg { font-size: 1.1rem; margin-bottom: 20px; color: var(--text-dim); }
+  .results-card button {
+    padding: 10px 28px; border: none; border-radius: 8px;
+    background: var(--accent); color: #fff; font-weight: 700;
+    font-size: 1rem; cursor: pointer;
+  }
+
+  /* RESPONSIVE */
+  @media (max-width: 640px) {
+    nav { padding: 0 12px; gap: 4px; }
+    nav .logo { font-size: 0.9rem; margin-right: 8px; }
+    nav button { padding: 6px 10px; font-size: 0.8rem; }
+    .section { padding: 20px 16px; }
+    .deck-container { height: 300px; }
+    .matching-container { grid-template-columns: 1fr; }
   }
 </style>
 </head>
 <body>
 
-<h1>Spanish Question Flashcards</h1>
-<div class="progress" id="progress"></div>
+<nav>
+  <div class="logo">Espanol</div>
+  <button class="active" onclick="showSection('flashcards')">Flashcards</button>
+  <button onclick="showSection('browse')">Browse</button>
+  <button onclick="showSection('test')">Test</button>
+  <button onclick="showSection('matching')">Matching</button>
+  <div class="score-display">
+    <span>Mastery</span>
+    <svg class="progress-ring" viewBox="0 0 40 40">
+      <circle class="bg" cx="20" cy="20" r="17"/>
+      <circle class="fg" id="masteryRing" cx="20" cy="20" r="17"
+        stroke-dasharray="106.8" stroke-dashoffset="106.8"
+        transform="rotate(-90 20 20)"/>
+    </svg>
+    <span class="streak" id="masteryPct">0%</span>
+  </div>
+</nav>
 
-<div class="card-container" id="cardContainer">
-  <div class="card" id="card">
-    <div class="card-face card-front">
-      <div class="card-label">Pregunta</div>
-      <div id="front"></div>
-      <div class="hint">Click to reveal answer</div>
+<!-- FLASHCARDS -->
+<div class="section active" id="sec-flashcards">
+  <h2>Flashcards</h2>
+  <p class="subtitle">Click to flip. Swipe or use arrows to navigate the deck.</p>
+  <div class="filter-bar" id="flashcard-filters"></div>
+  <div class="deck-container" id="deck-container"></div>
+  <p class="flip-hint">Click/Space = flip &nbsp; | &nbsp; Arrow keys = next/prev</p>
+  <div class="flashcard-controls">
+    <button class="btn-prev" onclick="prevCard()">Previous</button>
+    <span class="card-counter" id="card-counter">1 / 35</span>
+    <button class="btn-next" onclick="nextCard()">Next</button>
+    <button class="btn-shuffle" onclick="shuffleCards()">Shuffle</button>
+  </div>
+</div>
+
+<!-- BROWSE -->
+<div class="section" id="sec-browse">
+  <h2>Browse All</h2>
+  <p class="subtitle">Expand any question to see the answer.</p>
+  <div class="filter-bar" id="browse-filters"></div>
+  <div class="browse-list" id="browse-list"></div>
+</div>
+
+<!-- TEST MODE -->
+<div class="section" id="sec-test">
+  <h2>Test Mode</h2>
+  <p class="subtitle">Type your answer in Spanish for each question.</p>
+  <div class="test-header">
+    <div class="test-score">
+      <span>Score: <span class="correct-count" id="test-correct">0</span> / <span id="test-total">0</span></span>
+      <span class="wrong-count" id="test-wrong-display"></span>
     </div>
-    <div class="card-face card-back">
-      <div class="card-label">Respuesta</div>
-      <div id="back"></div>
+    <div class="test-actions">
+      <button class="btn-check-all" onclick="checkAllAnswers()">Check All</button>
+      <button class="btn-new-test" onclick="generateTest()">New Test</button>
+    </div>
+  </div>
+  <div id="test-questions"></div>
+</div>
+
+<!-- MATCHING -->
+<div class="section" id="sec-matching">
+  <h2>Matching</h2>
+  <p class="subtitle">Match each question to its answer. Click one from each column.</p>
+  <div class="test-actions" style="margin-bottom:16px">
+    <button class="btn-new-test" onclick="generateMatching()">New Round</button>
+    <span class="test-score" id="match-score"></span>
+  </div>
+  <div class="matching-container">
+    <div class="matching-col">
+      <h3>Preguntas</h3>
+      <div id="match-terms"></div>
+    </div>
+    <div class="matching-col">
+      <h3>Respuestas</h3>
+      <div id="match-defs"></div>
     </div>
   </div>
 </div>
 
-<div class="controls">
-  <button class="btn-prev" onclick="prev()">&#9664; Prev</button>
-  <button class="btn-flip" onclick="flip()">Flip</button>
-  <button class="btn-shuffle" onclick="shuffle()">Shuffle</button>
-  <button class="btn-next" onclick="next()">Next &#9654;</button>
+<!-- RESULTS OVERLAY -->
+<div class="results-overlay" id="results-overlay">
+  <div class="results-card">
+    <h2>Test Complete!</h2>
+    <div class="big-score" id="result-score">0%</div>
+    <div class="grade-msg" id="result-msg"></div>
+    <button onclick="closeResults()">Try Again</button>
+  </div>
 </div>
 
 <script>
-const cards = [
-  { q: "\u00bfC\u00f3mo te llamas?", a: "Me llamo... (My name is...)" },
-  { q: "\u00bfC\u00f3mo est\u00e1s?", a: "Estoy bien / mal / as\u00ed as\u00ed. (I'm good / bad / so-so.)" },
-  { q: "\u00bfDe d\u00f3nde eres?", a: "Soy de... (I am from...)" },
-  { q: "\u00bfCu\u00e1ntos a\u00f1os tienes?", a: "Tengo ... a\u00f1os. (I am ... years old.)" },
-  { q: "\u00bfD\u00f3nde vives?", a: "Vivo en... (I live in...)" },
-  { q: "\u00bfQu\u00e9 te gusta?", a: "Me gusta... (I like...)" },
-  { q: "Mucho Gusto\u2026", a: "Nice to meet you. / El gusto es m\u00edo. (The pleasure is mine.)" },
-  { q: "\u00bfCu\u00e1ntas clases tomas?", a: "Tomo ... clases. (I take ... classes.)" },
-  { q: "\u00bfTe gusta la clase de espa\u00f1ol?", a: "S\u00ed, me gusta. / No, no me gusta. (Yes, I like it. / No, I don't like it.)" },
-  { q: "\u00bfCu\u00e1ntas personas hay en tu clase de arte?", a: "Hay ... personas en mi clase de arte. (There are ... people in my art class.)" },
-  { q: "\u00bfCu\u00e1l es tu n\u00famero de tel\u00e9fono?", a: "Mi n\u00famero de tel\u00e9fono es... (My phone number is...)" },
-  { q: "\u00bfTienes una familia grande?", a: "S\u00ed, tengo una familia grande. / No, tengo una familia peque\u00f1a. (Yes/No, I have a big/small family.)" },
-  { q: "\u00bfDe d\u00f3nde son tus padres?", a: "Mis padres son de... (My parents are from...)" },
-  { q: "\u00bfTienes hermanos o hermanas?", a: "S\u00ed, tengo ... hermano(s)/hermana(s). / No, soy hijo/hija \u00fanico/a. (Yes, I have ... brother(s)/sister(s). / No, I'm an only child.)" },
-  { q: "\u00bfC\u00f3mo eres?", a: "Soy ... (alto/a, inteligente, divertido/a, etc.) (I am ... tall, smart, fun, etc.)" },
-  { q: "\u00bfQu\u00e9 vas a hacer esta noche?", a: "Voy a... (I am going to...)" },
-  { q: "\u00bfA qu\u00e9 eres aficionado?", a: "Soy aficionado/a a... (I am a fan of...)" },
-  { q: "\u00bfQu\u00e9 vas a hacer este verano?", a: "Voy a... (I am going to...)" },
-  { q: "\u00bfPiensas estudiar este verano?", a: "S\u00ed, pienso estudiar. / No, no pienso estudiar. (Yes/No, I plan to study.)" },
-  { q: "\u00bfPrefieres las pel\u00edculas rom\u00e1nticas, las de acci\u00f3n o las pel\u00edculas de horror? \u00bfPor qu\u00e9?", a: "Prefiero las pel\u00edculas ... porque... (I prefer ... movies because...)" },
-  { q: "\u00bfCu\u00e1ntas personas hay en tu familia?", a: "Hay ... personas en mi familia. (There are ... people in my family.)" },
-  { q: "\u00bfDe qu\u00e9 color es tu corbata?", a: "Mi corbata es... (My tie is... roja, azul, negra, etc.)" },
-  { q: "\u00bfDe qu\u00e9 color es la bandera de Espa\u00f1a?", a: "La bandera de Espa\u00f1a es roja y amarilla. (The flag of Spain is red and yellow.)" },
-  { q: "\u00bfQui\u00e9n es tu profesor de historia?", a: "Mi profesor/a de historia es... (My history teacher is...)" },
-  { q: "\u00bfCu\u00e1ndo es tu cumplea\u00f1os?", a: "Mi cumplea\u00f1os es el ... de ... (My birthday is on...)" },
-  { q: "\u00bfQu\u00e9 hora es?", a: "Es la una. / Son las ... (It is one o'clock. / It is ...)" },
-  { q: "\u00bfCu\u00e1ntos son 2 m\u00e1s 12?", a: "Son catorce. (They are fourteen.)" },
-  { q: "\u00bfCu\u00e1l es la fecha?", a: "Hoy es el ... de ... de ... (Today is the ...)" },
-  { q: "\u00bfQu\u00e9 deporte juegas en la primavera?", a: "Juego al ... en la primavera. (I play ... in the spring.)" },
-  { q: "\u00bfCu\u00e1ndo empieza la clase de espa\u00f1ol?", a: "La clase de espa\u00f1ol empieza a las... (Spanish class starts at...)" },
-  { q: "\u00bfCu\u00e1ndo almorzamos?", a: "Almorzamos a las... (We eat lunch at...)" },
-  { q: "\u00bfA qu\u00e9 hora vuelves a casa?", a: "Vuelvo a casa a las... (I return home at...)" },
-  { q: "\u00bfT\u00fa prefieres Pepsi o Coca Cola?", a: "Prefiero... (I prefer...)" },
-  { q: "\u00bfDuermes en la clase de espa\u00f1ol?", a: "No, no duermo en la clase. / S\u00ed, duermo en la clase. (No, I don't sleep in class. / Yes, I sleep in class.)" },
-  { q: "\u00bfC\u00f3mo se dice \u201cthe book\u201d en espa\u00f1ol?", a: "Se dice \u201cel libro.\u201d (You say \u201cel libro.\u201d)" }
+// ============ DATA ============
+const allCards = [
+  { q: "\u00bfC\u00f3mo te llamas?", a: "Me llamo...", eng: "My name is...", cat: "basics" },
+  { q: "\u00bfC\u00f3mo est\u00e1s?", a: "Estoy bien / mal / as\u00ed as\u00ed.", eng: "I'm good / bad / so-so.", cat: "basics" },
+  { q: "\u00bfDe d\u00f3nde eres?", a: "Soy de...", eng: "I am from...", cat: "basics" },
+  { q: "\u00bfCu\u00e1ntos a\u00f1os tienes?", a: "Tengo ... a\u00f1os.", eng: "I am ... years old.", cat: "basics" },
+  { q: "\u00bfD\u00f3nde vives?", a: "Vivo en...", eng: "I live in...", cat: "basics" },
+  { q: "\u00bfQu\u00e9 te gusta?", a: "Me gusta...", eng: "I like...", cat: "basics" },
+  { q: "Mucho Gusto\u2026", a: "El gusto es m\u00edo.", eng: "Nice to meet you. / The pleasure is mine.", cat: "basics" },
+  { q: "\u00bfCu\u00e1ntas clases tomas?", a: "Tomo ... clases.", eng: "I take ... classes.", cat: "school" },
+  { q: "\u00bfTe gusta la clase de espa\u00f1ol?", a: "S\u00ed, me gusta. / No, no me gusta.", eng: "Yes, I like it. / No, I don't like it.", cat: "school" },
+  { q: "\u00bfCu\u00e1ntas personas hay en tu clase de arte?", a: "Hay ... personas en mi clase de arte.", eng: "There are ... people in my art class.", cat: "school" },
+  { q: "\u00bfCu\u00e1l es tu n\u00famero de tel\u00e9fono?", a: "Mi n\u00famero de tel\u00e9fono es...", eng: "My phone number is...", cat: "basics" },
+  { q: "\u00bfTienes una familia grande?", a: "S\u00ed, tengo una familia grande. / No, tengo una familia peque\u00f1a.", eng: "Yes/No, I have a big/small family.", cat: "family" },
+  { q: "\u00bfDe d\u00f3nde son tus padres?", a: "Mis padres son de...", eng: "My parents are from...", cat: "family" },
+  { q: "\u00bfTienes hermanos o hermanas?", a: "S\u00ed, tengo ... hermano(s)/hermana(s). / No, soy hijo/a \u00fanico/a.", eng: "Yes, I have ... brother(s)/sister(s). / No, I'm an only child.", cat: "family" },
+  { q: "\u00bfC\u00f3mo eres?", a: "Soy ... (alto/a, inteligente, divertido/a)", eng: "I am ... (tall, smart, fun, etc.)", cat: "basics" },
+  { q: "\u00bfQu\u00e9 vas a hacer esta noche?", a: "Voy a...", eng: "I am going to...", cat: "plans" },
+  { q: "\u00bfA qu\u00e9 eres aficionado?", a: "Soy aficionado/a a...", eng: "I am a fan of...", cat: "preferences" },
+  { q: "\u00bfQu\u00e9 vas a hacer este verano?", a: "Voy a...", eng: "I am going to...", cat: "plans" },
+  { q: "\u00bfPiensas estudiar este verano?", a: "S\u00ed, pienso estudiar. / No, no pienso estudiar.", eng: "Yes/No, I plan to study.", cat: "plans" },
+  { q: "\u00bfPrefieres las pel\u00edculas rom\u00e1nticas, las de acci\u00f3n o las de horror?", a: "Prefiero las pel\u00edculas ... porque...", eng: "I prefer ... movies because...", cat: "preferences" },
+  { q: "\u00bfCu\u00e1ntas personas hay en tu familia?", a: "Hay ... personas en mi familia.", eng: "There are ... people in my family.", cat: "family" },
+  { q: "\u00bfDe qu\u00e9 color es tu corbata?", a: "Mi corbata es... (roja, azul, negra)", eng: "My tie is... (red, blue, black)", cat: "descriptions" },
+  { q: "\u00bfDe qu\u00e9 color es la bandera de Espa\u00f1a?", a: "La bandera de Espa\u00f1a es roja y amarilla.", eng: "The flag of Spain is red and yellow.", cat: "descriptions" },
+  { q: "\u00bfQui\u00e9n es tu profesor de historia?", a: "Mi profesor/a de historia es...", eng: "My history teacher is...", cat: "school" },
+  { q: "\u00bfCu\u00e1ndo es tu cumplea\u00f1os?", a: "Mi cumplea\u00f1os es el ... de ...", eng: "My birthday is on...", cat: "time" },
+  { q: "\u00bfQu\u00e9 hora es?", a: "Es la una. / Son las ...", eng: "It is one o'clock. / It is ...", cat: "time" },
+  { q: "\u00bfCu\u00e1ntos son 2 m\u00e1s 12?", a: "Son catorce.", eng: "They are fourteen.", cat: "time" },
+  { q: "\u00bfCu\u00e1l es la fecha?", a: "Hoy es el ... de ... de ...", eng: "Today is the ...", cat: "time" },
+  { q: "\u00bfQu\u00e9 deporte juegas en la primavera?", a: "Juego al ... en la primavera.", eng: "I play ... in the spring.", cat: "preferences" },
+  { q: "\u00bfCu\u00e1ndo empieza la clase de espa\u00f1ol?", a: "La clase de espa\u00f1ol empieza a las...", eng: "Spanish class starts at...", cat: "school" },
+  { q: "\u00bfCu\u00e1ndo almorzamos?", a: "Almorzamos a las...", eng: "We eat lunch at...", cat: "time" },
+  { q: "\u00bfA qu\u00e9 hora vuelves a casa?", a: "Vuelvo a casa a las...", eng: "I return home at...", cat: "time" },
+  { q: "\u00bfT\u00fa prefieres Pepsi o Coca Cola?", a: "Prefiero...", eng: "I prefer...", cat: "preferences" },
+  { q: "\u00bfDuermes en la clase de espa\u00f1ol?", a: "No, no duermo en la clase. / S\u00ed, duermo en la clase.", eng: "No, I don't sleep in class. / Yes, I sleep in class.", cat: "school" },
+  { q: "\u00bfC\u00f3mo se dice \u201cthe book\u201d en espa\u00f1ol?", a: "Se dice \u201cel libro.\u201d", eng: "You say 'el libro.'", cat: "descriptions" }
 ];
 
-let current = 0;
+let filteredCards = [...allCards];
+let cardIndex = 0;
 
-function render() {
-  document.getElementById('front').textContent = cards[current].q;
-  document.getElementById('back').textContent = cards[current].a;
-  document.getElementById('card').classList.remove('flipped');
-  document.getElementById('progress').textContent = `Card ${current + 1} of ${cards.length}`;
+// ============ NAVIGATION ============
+function showSection(name) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.getElementById('sec-' + name).classList.add('active');
+  document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+  if (name === 'test' && document.getElementById('test-questions').children.length === 0) generateTest();
+  if (name === 'matching' && document.getElementById('match-terms').children.length === 0) generateMatching();
 }
 
-function flip() {
-  document.getElementById('card').classList.toggle('flipped');
+// ============ FLASHCARDS (DECK) ============
+let isAnimating = false;
+const VISIBLE_STACK = 4;
+
+function buildDeck() {
+  const container = document.getElementById('deck-container');
+  container.innerHTML = '';
+  if (filteredCards.length === 0) return;
+  filteredCards.forEach((card, i) => {
+    const el = document.createElement('div');
+    el.className = 'deck-card';
+    el.dataset.index = i;
+    el.innerHTML = `
+      <div class="card-inner">
+        <div class="card-face card-front">
+          <div class="label">Pregunta</div>
+          <div class="term">${card.q}</div>
+        </div>
+        <div class="card-face card-back card-back-content">
+          <div class="label">Respuesta</div>
+          <div class="definition">${card.a}</div>
+          <div style="margin-top:12px;font-size:0.85rem;color:var(--accent2)">${card.eng}</div>
+        </div>
+      </div>`;
+    el.addEventListener('click', () => {
+      if (el.dataset.depth === '0' && !isAnimating) flipTopCard();
+    });
+    container.appendChild(el);
+  });
+  cardIndex = 0;
+  layoutDeck();
 }
 
-document.getElementById('cardContainer').addEventListener('click', flip);
-
-function next() {
-  current = (current + 1) % cards.length;
-  render();
+function layoutDeck() {
+  const cards = document.querySelectorAll('#deck-container .deck-card');
+  const total = filteredCards.length;
+  cards.forEach(el => {
+    const i = parseInt(el.dataset.index);
+    let offset = (i - cardIndex + total) % total;
+    if (offset < VISIBLE_STACK) {
+      el.dataset.depth = offset;
+    } else {
+      el.dataset.depth = 'hidden';
+    }
+    el.classList.remove('swipe-left', 'swipe-right', 'flipped', 'arriving');
+  });
+  document.getElementById('card-counter').textContent = `${cardIndex + 1} / ${total}`;
 }
 
-function prev() {
-  current = (current - 1 + cards.length) % cards.length;
-  render();
+function flipTopCard() {
+  const top = document.querySelector('.deck-card[data-depth="0"]');
+  if (top) top.classList.toggle('flipped');
 }
 
-function shuffle() {
-  for (let i = cards.length - 1; i > 0; i--) {
+function nextCard() {
+  if (isAnimating || filteredCards.length === 0) return;
+  isAnimating = true;
+  const top = document.querySelector('.deck-card[data-depth="0"]');
+  top.classList.add('swipe-left');
+  setTimeout(() => {
+    cardIndex = (cardIndex + 1) % filteredCards.length;
+    top.classList.remove('swipe-left', 'flipped');
+    layoutDeck();
+    document.querySelectorAll('#deck-container .deck-card').forEach(c => {
+      if (c.dataset.depth !== 'hidden') c.classList.add('arriving');
+    });
+    setTimeout(() => {
+      document.querySelectorAll('.deck-card.arriving').forEach(c => c.classList.remove('arriving'));
+      isAnimating = false;
+    }, 350);
+  }, 400);
+}
+
+function prevCard() {
+  if (isAnimating || filteredCards.length === 0) return;
+  isAnimating = true;
+  const top = document.querySelector('.deck-card[data-depth="0"]');
+  top.classList.add('swipe-right');
+  setTimeout(() => {
+    cardIndex = (cardIndex - 1 + filteredCards.length) % filteredCards.length;
+    top.classList.remove('swipe-right', 'flipped');
+    layoutDeck();
+    document.querySelectorAll('#deck-container .deck-card').forEach(c => {
+      if (c.dataset.depth !== 'hidden') c.classList.add('arriving');
+    });
+    setTimeout(() => {
+      document.querySelectorAll('.deck-card.arriving').forEach(c => c.classList.remove('arriving'));
+      isAnimating = false;
+    }, 350);
+  }, 400);
+}
+
+function shuffleCards() {
+  for (let i = filteredCards.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
-    [cards[i], cards[j]] = [cards[j], cards[i]];
+    [filteredCards[i], filteredCards[j]] = [filteredCards[j], filteredCards[i]];
   }
-  current = 0;
-  render();
+  cardIndex = 0;
+  buildDeck();
 }
 
+// Touch swipe
+let touchStartX = 0;
+document.getElementById('deck-container').addEventListener('touchstart', (e) => {
+  touchStartX = e.touches[0].clientX;
+}, { passive: true });
+document.getElementById('deck-container').addEventListener('touchend', (e) => {
+  const diff = e.changedTouches[0].clientX - touchStartX;
+  if (Math.abs(diff) > 60) {
+    if (diff < 0) nextCard(); else prevCard();
+  }
+}, { passive: true });
+
+// Filters
+function buildFilters(containerId, onFilter) {
+  const cats = ['all', ...new Set(allCards.map(c => c.cat))];
+  const container = document.getElementById(containerId);
+  const catLabels = { all: 'All', basics: 'Basics', school: 'School', family: 'Family', plans: 'Plans', preferences: 'Preferences', descriptions: 'Descriptions', time: 'Time & Numbers' };
+  cats.forEach(cat => {
+    const btn = document.createElement('button');
+    btn.textContent = catLabels[cat] || cat.charAt(0).toUpperCase() + cat.slice(1);
+    if (cat === 'all') btn.classList.add('active');
+    btn.onclick = () => {
+      container.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      onFilter(cat);
+    };
+    container.appendChild(btn);
+  });
+}
+
+function filterFlashcards(cat) {
+  filteredCards = cat === 'all' ? [...allCards] : allCards.filter(c => c.cat === cat);
+  cardIndex = 0; buildDeck();
+}
+
+// ============ BROWSE ============
+function buildBrowse(cat) {
+  const list = document.getElementById('browse-list');
+  list.innerHTML = '';
+  const items = cat === 'all' ? allCards : allCards.filter(c => c.cat === cat);
+  items.forEach(card => {
+    const div = document.createElement('div');
+    div.className = 'browse-item';
+    div.innerHTML = `
+      <div class="browse-header" onclick="this.parentElement.classList.toggle('open')">
+        <span class="term-name">${card.q}</span>
+        <span style="display:flex;gap:8px;align-items:center">
+          <span class="tag">${card.cat}</span>
+          <span class="arrow">&#9654;</span>
+        </span>
+      </div>
+      <div class="browse-body"><div class="browse-body-inner"><strong>${card.a}</strong><br><span style="color:var(--accent2)">${card.eng}</span></div></div>`;
+    list.appendChild(div);
+  });
+}
+
+// ============ TEST MODE ============
+let testCorrect = 0, testWrong = 0, testTotal = 0;
+
+function generateTest() {
+  testCorrect = 0; testWrong = 0;
+  document.getElementById('test-correct').textContent = '0';
+  document.getElementById('test-wrong-display').textContent = '';
+  const container = document.getElementById('test-questions');
+  container.innerHTML = '';
+
+  // Pick 10 random questions
+  const shuffled = [...allCards].sort(() => Math.random() - 0.5).slice(0, 10);
+  testTotal = shuffled.length;
+  document.getElementById('test-total').textContent = testTotal;
+
+  shuffled.forEach((card, i) => {
+    // Extract the key phrase from the answer (before any / or parenthetical)
+    const keywords = card.a.split('/')[0].replace(/\.\.\./g, '').replace(/\(.*?\)/g, '').trim().toLowerCase()
+      .replace(/[^a-z\u00e0-\u00ff\s]/g, '').split(/\s+/).filter(w => w.length > 2);
+
+    const div = document.createElement('div');
+    div.className = 'test-question';
+    div.dataset.answered = 'false';
+    div.innerHTML = `
+      <div class="q-num">Question ${i + 1} <span class="q-type">Spanish Response</span></div>
+      <div class="q-text">${card.q}</div>
+      <input type="text" placeholder="Type your answer in Spanish..." data-answer="${encodeURIComponent(card.a)}" data-keywords='${JSON.stringify(keywords)}' data-eng="${encodeURIComponent(card.eng)}">
+      <div class="feedback"></div>
+      <button class="check-btn" onclick="checkSingle(this)">Check</button>`;
+    container.appendChild(div);
+  });
+}
+
+function normalize(s) { return s.trim().toLowerCase().replace(/[^a-z\u00e0-\u00ff0-9\s]/g, ''); }
+
+function checkSingle(btn) {
+  const question = btn.closest('.test-question');
+  if (question.dataset.answered === 'true') return;
+  const input = question.querySelector('input');
+  const feedback = question.querySelector('.feedback');
+  const userAnswer = normalize(input.value);
+  const correctAnswer = decodeURIComponent(input.dataset.answer);
+  const keywords = JSON.parse(input.dataset.keywords || '[]');
+  const eng = decodeURIComponent(input.dataset.eng);
+
+  // Check if user's answer contains key Spanish words
+  let hits = 0;
+  keywords.forEach(kw => { if (userAnswer.includes(kw)) hits++; });
+  const isCorrect = keywords.length > 0 ? hits >= Math.max(1, Math.ceil(keywords.length * 0.5)) : userAnswer.length > 2;
+
+  question.dataset.answered = 'true';
+  feedback.classList.add('show');
+  btn.disabled = true;
+
+  if (isCorrect) {
+    input.classList.add('correct');
+    question.classList.add('answered-correct');
+    feedback.classList.add('correct-fb');
+    feedback.textContent = 'Correct!';
+    testCorrect++;
+  } else {
+    input.classList.add('wrong');
+    question.classList.add('answered-wrong');
+    feedback.classList.add('wrong-fb');
+    feedback.innerHTML = `Answer: <strong>${correctAnswer}</strong> <span style="color:var(--text-dim)">(${eng})</span>`;
+    testWrong++;
+  }
+
+  document.getElementById('test-correct').textContent = testCorrect;
+  document.getElementById('test-wrong-display').textContent = testWrong > 0 ? `(${testWrong} wrong)` : '';
+  updateMastery();
+
+  const allAnswered = [...document.querySelectorAll('.test-question')].every(q => q.dataset.answered === 'true');
+  if (allAnswered) showResults();
+}
+
+function checkAllAnswers() {
+  document.querySelectorAll('.test-question .check-btn').forEach(btn => {
+    if (!btn.disabled) checkSingle(btn);
+  });
+}
+
+function showResults() {
+  const pct = Math.round((testCorrect / testTotal) * 100);
+  document.getElementById('result-score').textContent = pct + '%';
+  let msg = '';
+  if (pct >= 90) msg = "Excelente! You're ready!";
+  else if (pct >= 70) msg = "Muy bien! Review the ones you missed.";
+  else if (pct >= 50) msg = "Getting there. Keep practicing!";
+  else msg = "Keep studying! Use the flashcards to review.";
+  document.getElementById('result-msg').textContent = msg;
+  document.getElementById('results-overlay').classList.add('show');
+}
+
+function closeResults() {
+  document.getElementById('results-overlay').classList.remove('show');
+  generateTest();
+}
+
+// ============ MATCHING ============
+let matchState = { selectedTerm: null, selectedDef: null, matched: 0, total: 0, correct: 0 };
+
+function generateMatching() {
+  matchState = { selectedTerm: null, selectedDef: null, matched: 0, total: 6, correct: 0 };
+  const items = [...allCards].sort(() => Math.random() - 0.5).slice(0, 6);
+  const termsDiv = document.getElementById('match-terms');
+  const defsDiv = document.getElementById('match-defs');
+  termsDiv.innerHTML = '';
+  defsDiv.innerHTML = '';
+  document.getElementById('match-score').textContent = '';
+
+  const shuffledDefs = [...items].sort(() => Math.random() - 0.5);
+
+  items.forEach(item => {
+    const termEl = document.createElement('div');
+    termEl.className = 'match-item';
+    termEl.textContent = item.q;
+    termEl.dataset.key = item.q;
+    termEl.dataset.side = 'term';
+    termEl.onclick = () => selectMatch(termEl);
+    termsDiv.appendChild(termEl);
+  });
+
+  shuffledDefs.forEach(item => {
+    const defEl = document.createElement('div');
+    defEl.className = 'match-item';
+    defEl.textContent = item.a;
+    defEl.dataset.key = item.q;
+    defEl.dataset.side = 'def';
+    defEl.onclick = () => selectMatch(defEl);
+    defsDiv.appendChild(defEl);
+  });
+}
+
+function selectMatch(el) {
+  if (el.classList.contains('matched-correct')) return;
+  const side = el.dataset.side;
+
+  el.parentElement.querySelectorAll('.match-item').forEach(e => e.classList.remove('selected', 'matched-wrong'));
+  el.classList.add('selected');
+
+  if (side === 'term') matchState.selectedTerm = el;
+  else matchState.selectedDef = el;
+
+  if (matchState.selectedTerm && matchState.selectedDef) {
+    const termKey = matchState.selectedTerm.dataset.key;
+    const defKey = matchState.selectedDef.dataset.key;
+
+    if (termKey === defKey) {
+      matchState.selectedTerm.classList.remove('selected');
+      matchState.selectedDef.classList.remove('selected');
+      matchState.selectedTerm.classList.add('matched-correct');
+      matchState.selectedDef.classList.add('matched-correct');
+      matchState.correct++;
+      matchState.matched++;
+    } else {
+      matchState.selectedTerm.classList.add('matched-wrong');
+      matchState.selectedDef.classList.add('matched-wrong');
+      setTimeout(() => {
+        matchState.selectedTerm?.classList.remove('selected', 'matched-wrong');
+        matchState.selectedDef?.classList.remove('selected', 'matched-wrong');
+        matchState.selectedTerm = null;
+        matchState.selectedDef = null;
+      }, 800);
+      matchState.matched++;
+    }
+
+    document.getElementById('match-score').textContent = `${matchState.correct} / ${matchState.total}`;
+    matchState.selectedTerm = null;
+    matchState.selectedDef = null;
+
+    if (matchState.correct === matchState.total) {
+      document.getElementById('match-score').textContent = 'All matched! Great job!';
+    }
+  }
+}
+
+// ============ MASTERY ============
+function updateMastery() {
+  const pct = Math.round((testCorrect / Math.max(testTotal, 1)) * 100);
+  const ring = document.getElementById('masteryRing');
+  const circumference = 106.8;
+  ring.style.strokeDashoffset = circumference - (circumference * pct / 100);
+  document.getElementById('masteryPct').textContent = pct + '%';
+}
+
+// ============ KEYBOARD ============
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'ArrowRight') next();
-  else if (e.key === 'ArrowLeft') prev();
-  else if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); flip(); }
+  const active = document.querySelector('.section.active');
+  if (!active) return;
+  if (active.id === 'sec-flashcards') {
+    if (e.target.tagName === 'INPUT') return;
+    if (e.code === 'Space') { e.preventDefault(); flipTopCard(); }
+    if (e.code === 'ArrowRight' || e.code === 'ArrowDown') { e.preventDefault(); nextCard(); }
+    if (e.code === 'ArrowLeft' || e.code === 'ArrowUp') { e.preventDefault(); prevCard(); }
+  }
 });
 
-render();
+// ============ INIT ============
+buildFilters('flashcard-filters', filterFlashcards);
+buildFilters('browse-filters', buildBrowse);
+buildDeck();
+buildBrowse('all');
 </script>
 </body>
 </html>
