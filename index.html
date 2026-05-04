@@ -49,6 +49,22 @@
   }
   nav button:hover { color: var(--text); background: var(--surface2); }
   nav button.active { color: var(--accent); background: var(--surface); }
+
+  /* DROPDOWN */
+  .nav-dropdown { position: relative; display: inline-block; }
+  .nav-dropdown-menu {
+    position: absolute; top: 100%; left: 0;
+    background: var(--surface); border: 1px solid rgba(46,204,113,0.2);
+    border-radius: 8px; padding: 4px; min-width: 140px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+    display: none; z-index: 101; margin-top: 4px;
+  }
+  .nav-dropdown:hover .nav-dropdown-menu { display: block; }
+  .nav-dropdown-menu button {
+    display: block; width: 100%; text-align: left;
+    padding: 8px 14px; font-size: 0.85rem;
+  }
+  .nav-dropdown-menu button.active { color: var(--accent); background: var(--surface2); }
   .score-display {
     margin-left: auto;
     font-size: 0.85rem; color: var(--text-dim);
@@ -318,10 +334,16 @@
 
 <nav>
   <div class="logo">Espanol</div>
-  <button class="active" onclick="showSection('flashcards')">Flashcards</button>
-  <button onclick="showSection('browse')">Browse</button>
-  <button onclick="showSection('test')">Test</button>
-  <button onclick="showSection('matching')">Matching</button>
+  <div class="nav-dropdown">
+    <button class="active" id="nav-flashcards" onclick="showSection('flashcards', event)">Flashcards</button>
+    <div class="nav-dropdown-menu">
+      <button class="active" id="mode-normal" onclick="setMode('normal', event)">Normal</button>
+      <button id="mode-calvin" onclick="setMode('calvin', event)">Calvin</button>
+    </div>
+  </div>
+  <button onclick="showSection('browse', event)">Browse</button>
+  <button onclick="showSection('test', event)">Test</button>
+  <button onclick="showSection('matching', event)">Matching</button>
   <div class="score-display">
     <span>Mastery</span>
     <svg class="progress-ring" viewBox="0 0 40 40">
@@ -444,17 +466,76 @@ const allCards = [
   { q: "\u00bfC\u00f3mo se dice \u201cthe book\u201d en espa\u00f1ol?", a: "Se dice \u201cel libro.\u201d", eng: "You say 'el libro.'", cat: "descriptions" }
 ];
 
+// Calvin's personalized variants — overrides keyed by the original question.
+const calvinOverrides = {
+  "¿Cuál es tu número de teléfono?": {
+    a: "No tengo número de teléfono. ¿Y el tuyo?",
+    eng: "I don't have a phone number. And yours?"
+  },
+  "¿Tienes una familia grande?": {
+    a: "No, no tengo una familia grande. Mi padre es de Taiwán y los todos de mi familia son de Taiwán.",
+    eng: "No, I don't have a big family. My dad is from Taiwan and everyone in my family is from Taiwan."
+  },
+  "¿De dónde son tus padres?": {
+    a: "Mi madre es de Taiwán y mi padre también es de Taiwán.",
+    eng: "My mother is from Taiwan and my father is also from Taiwan."
+  },
+  "¿Cómo eres?": {
+    a: "Soy alto, inteligente y divertido. ¿Y usted?",
+    eng: "I am tall, smart and fun. And you (formal)?"
+  },
+  "¿Prefieres las películas románticas, las de acción o las de horror?": {
+    a: "Prefiero las películas de acción porque son emocionantes.",
+    eng: "I prefer action movies because they are exciting."
+  },
+  "¿A qué eres aficionado?": {
+    a: "Soy aficionado al baloncesto.",
+    eng: "I am a fan of basketball."
+  },
+  "¿Qué vas a hacer este verano?": {
+    a: "Voy a estudiar y voy a jugar al baloncesto.",
+    eng: "I am going to study and play basketball."
+  },
+  "¿Piensas estudiar este verano?": {
+    a: "Sí, pienso estudiar a las siete de la noche después del deporte.",
+    eng: "Yes, I plan to study at 7pm after sports."
+  }
+};
+
+let mode = 'normal';
+let currentFlashcardCat = 'all';
+function getDeck() {
+  if (mode === 'normal') return allCards;
+  return allCards.map(c => {
+    const ov = calvinOverrides[c.q];
+    return ov ? { ...c, a: ov.a, eng: ov.eng } : c;
+  });
+}
+
 let filteredCards = [...allCards];
 let cardIndex = 0;
 
 // ============ NAVIGATION ============
-function showSection(name) {
+function showSection(name, evt) {
   document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
   document.getElementById('sec-' + name).classList.add('active');
-  document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
-  event.target.classList.add('active');
+  document.querySelectorAll('nav > button, nav > .nav-dropdown > button').forEach(b => b.classList.remove('active'));
+  if (evt && evt.target) evt.target.classList.add('active');
   if (name === 'test' && document.getElementById('test-questions').children.length === 0) generateTest();
   if (name === 'matching' && document.getElementById('match-terms').children.length === 0) generateMatching();
+}
+
+function setMode(newMode, evt) {
+  if (evt) { evt.stopPropagation(); }
+  mode = newMode;
+  document.getElementById('mode-normal').classList.toggle('active', mode === 'normal');
+  document.getElementById('mode-calvin').classList.toggle('active', mode === 'calvin');
+  const flashBtn = document.getElementById('nav-flashcards');
+  flashBtn.textContent = mode === 'calvin' ? 'Flashcards (Calvin)' : 'Flashcards';
+  filterFlashcards(currentFlashcardCat);
+  buildBrowse('all');
+  if (document.getElementById('test-questions').children.length > 0) generateTest();
+  if (document.getElementById('match-terms').children.length > 0) generateMatching();
 }
 
 // ============ FLASHCARDS (DECK) ============
@@ -589,7 +670,9 @@ function buildFilters(containerId, onFilter) {
 }
 
 function filterFlashcards(cat) {
-  filteredCards = cat === 'all' ? [...allCards] : allCards.filter(c => c.cat === cat);
+  currentFlashcardCat = cat;
+  const deck = getDeck();
+  filteredCards = cat === 'all' ? [...deck] : deck.filter(c => c.cat === cat);
   cardIndex = 0; buildDeck();
 }
 
@@ -597,7 +680,8 @@ function filterFlashcards(cat) {
 function buildBrowse(cat) {
   const list = document.getElementById('browse-list');
   list.innerHTML = '';
-  const items = cat === 'all' ? allCards : allCards.filter(c => c.cat === cat);
+  const deck = getDeck();
+  const items = cat === 'all' ? deck : deck.filter(c => c.cat === cat);
   items.forEach(card => {
     const div = document.createElement('div');
     div.className = 'browse-item';
@@ -625,7 +709,7 @@ function generateTest() {
   container.innerHTML = '';
 
   // Pick 10 random questions
-  const shuffled = [...allCards].sort(() => Math.random() - 0.5).slice(0, 10);
+  const shuffled = [...getDeck()].sort(() => Math.random() - 0.5).slice(0, 10);
   testTotal = shuffled.length;
   document.getElementById('test-total').textContent = testTotal;
 
@@ -718,7 +802,7 @@ let matchState = { selectedTerm: null, selectedDef: null, matched: 0, total: 0, 
 
 function generateMatching() {
   matchState = { selectedTerm: null, selectedDef: null, matched: 0, total: 6, correct: 0 };
-  const items = [...allCards].sort(() => Math.random() - 0.5).slice(0, 6);
+  const items = [...getDeck()].sort(() => Math.random() - 0.5).slice(0, 6);
   const termsDiv = document.getElementById('match-terms');
   const defsDiv = document.getElementById('match-defs');
   termsDiv.innerHTML = '';
