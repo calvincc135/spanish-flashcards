@@ -557,7 +557,7 @@ const calvinOverrides = {
     eng: "My birthday is June 24th."
   },
   "¿Cuál es la fecha?": {
-    a: "Hoy es trece de mayo de dos mil veintiséis.",
+    a: "Hoy es el trece de mayo de dos mil veintiséis.",
     eng: "Today is May 13th, 2026."
   },
   "¿Qué deporte juegas en la primavera?": {
@@ -647,7 +647,6 @@ function setMode(newMode, evt) {
 }
 
 // ============ FLASHCARDS (DECK) ============
-let isAnimating = false;
 const VISIBLE_STACK = 4;
 
 function buildDeck() {
@@ -671,7 +670,7 @@ function buildDeck() {
         </div>
       </div>`;
     el.addEventListener('click', () => {
-      if (el.dataset.depth === '0' && !isAnimating) flipTopCard();
+      if (el.dataset.depth === '0') flipTopCard();
     });
     container.appendChild(el);
   });
@@ -701,41 +700,15 @@ function flipTopCard() {
 }
 
 function nextCard() {
-  if (isAnimating || filteredCards.length === 0) return;
-  isAnimating = true;
-  const top = document.querySelector('.deck-card[data-depth="0"]');
-  top.classList.add('swipe-left');
-  setTimeout(() => {
-    cardIndex = (cardIndex + 1) % filteredCards.length;
-    top.classList.remove('swipe-left', 'flipped');
-    layoutDeck();
-    document.querySelectorAll('#deck-container .deck-card').forEach(c => {
-      if (c.dataset.depth !== 'hidden') c.classList.add('arriving');
-    });
-    setTimeout(() => {
-      document.querySelectorAll('.deck-card.arriving').forEach(c => c.classList.remove('arriving'));
-      isAnimating = false;
-    }, 350);
-  }, 400);
+  if (filteredCards.length === 0) return;
+  cardIndex = (cardIndex + 1) % filteredCards.length;
+  layoutDeck();
 }
 
 function prevCard() {
-  if (isAnimating || filteredCards.length === 0) return;
-  isAnimating = true;
-  const top = document.querySelector('.deck-card[data-depth="0"]');
-  top.classList.add('swipe-right');
-  setTimeout(() => {
-    cardIndex = (cardIndex - 1 + filteredCards.length) % filteredCards.length;
-    top.classList.remove('swipe-right', 'flipped');
-    layoutDeck();
-    document.querySelectorAll('#deck-container .deck-card').forEach(c => {
-      if (c.dataset.depth !== 'hidden') c.classList.add('arriving');
-    });
-    setTimeout(() => {
-      document.querySelectorAll('.deck-card.arriving').forEach(c => c.classList.remove('arriving'));
-      isAnimating = false;
-    }, 350);
-  }, 400);
+  if (filteredCards.length === 0) return;
+  cardIndex = (cardIndex - 1 + filteredCards.length) % filteredCards.length;
+  layoutDeck();
 }
 
 function shuffleCards() {
