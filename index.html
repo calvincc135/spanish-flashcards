@@ -177,6 +177,14 @@
   .btn-shuffle:hover { background: var(--accent); color: var(--bg); }
   .card-counter { color: var(--text-dim); font-size: 0.9rem; min-width: 80px; text-align: center; }
   .flip-hint { color: var(--text-dim); font-size: 0.8rem; margin-top: 8px; text-align: center; }
+  .speaker-btn {
+    background: var(--surface2); color: var(--accent);
+    border: 2px solid var(--accent); border-radius: 50%;
+    width: 96px; height: 96px; font-size: 2.4rem;
+    cursor: pointer; transition: all 0.2s;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .speaker-btn:hover { background: var(--accent); color: var(--bg); transform: scale(1.05); }
 
   /* CATEGORY FILTER */
   .filter-bar {
@@ -351,6 +359,8 @@
     <div class="nav-dropdown-menu">
       <button class="active" id="mode-normal" onclick="setMode('normal', event)">Normal</button>
       <button id="mode-calvin" onclick="setMode('calvin', event)">Calvin</button>
+      <button id="mode-normal-hearing" onclick="setMode('normal-hearing', event)">Normal (Listen)</button>
+      <button id="mode-calvin-hearing" onclick="setMode('calvin-hearing', event)">Calvin (Listen)</button>
     </div>
   </div>
   <button onclick="showSection('browse', event)">Browse</button>
@@ -612,12 +622,32 @@ const calvinOverrides = {
 
 let mode = 'normal';
 let currentFlashcardCat = 'all';
+function isCalvinMode() { return mode === 'calvin' || mode === 'calvin-hearing'; }
+function isHearingMode() { return mode === 'normal-hearing' || mode === 'calvin-hearing'; }
 function getDeck() {
-  if (mode === 'normal') return allCards;
+  if (!isCalvinMode()) return allCards;
   return allCards.map(c => {
     const ov = calvinOverrides[c.q];
     return ov ? { ...c, a: ov.a, eng: ov.eng } : c;
   });
+}
+
+// ============ AUDIO ============
+function speak(text) {
+  if (!('speechSynthesis' in window)) return;
+  window.speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = 'es-ES';
+  u.rate = 0.9;
+  const voices = window.speechSynthesis.getVoices();
+  const esVoice = voices.find(v => v.lang && v.lang.toLowerCase().startsWith('es'));
+  if (esVoice) u.voice = esVoice;
+  window.speechSynthesis.speak(u);
+}
+function speakCurrentCard() {
+  if (!isHearingMode() || filteredCards.length === 0) return;
+  const card = filteredCards[cardIndex];
+  if (card) speak(card.q);
 }
 
 let filteredCards = [...allCards];
@@ -636,10 +666,18 @@ function showSection(name, evt) {
 function setMode(newMode, evt) {
   if (evt) { evt.stopPropagation(); }
   mode = newMode;
-  document.getElementById('mode-normal').classList.toggle('active', mode === 'normal');
-  document.getElementById('mode-calvin').classList.toggle('active', mode === 'calvin');
+  ['mode-normal', 'mode-calvin', 'mode-normal-hearing', 'mode-calvin-hearing'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.classList.toggle('active', 'mode-' + mode === id);
+  });
   const flashBtn = document.getElementById('nav-flashcards');
-  flashBtn.textContent = mode === 'calvin' ? 'Flashcards (Calvin)' : 'Flashcards';
+  const labels = {
+    'normal': 'Flashcards',
+    'calvin': 'Flashcards (Calvin)',
+    'normal-hearing': 'Flashcards (Listen)',
+    'calvin-hearing': 'Flashcards (Calvin Listen)'
+  };
+  flashBtn.textContent = labels[mode] || 'Flashcards';
   filterFlashcards(currentFlashcardCat);
   buildBrowse('all');
   if (document.getElementById('test-questions').children.length > 0) generateTest();
@@ -653,29 +691,42 @@ function buildDeck() {
   const container = document.getElementById('deck-container');
   container.innerHTML = '';
   if (filteredCards.length === 0) return;
+  const hearing = isHearingMode();
   filteredCards.forEach((card, i) => {
     const el = document.createElement('div');
     el.className = 'deck-card';
     el.dataset.index = i;
+    const frontInner = hearing
+      ? `<div class="label">Escucha</div>
+         <button class="speaker-btn" aria-label="Play">🔊</button>
+         <div style="margin-top:14px;color:var(--text-dim);font-size:0.85rem">Tap speaker to replay · click card to flip</div>`
+      : `<div class="label">Pregunta</div>
+         <div class="term">${card.q}</div>`;
     el.innerHTML = `
       <div class="card-inner">
         <div class="card-face card-front">
-          <div class="label">Pregunta</div>
-          <div class="term">${card.q}</div>
+          ${frontInner}
         </div>
         <div class="card-face card-back card-back-content">
           <div class="label">Respuesta</div>
+          ${hearing ? `<div class="term" style="font-size:1.1rem;margin-bottom:10px">${card.q}</div>` : ''}
           <div class="definition">${card.a}</div>
           <div style="margin-top:12px;font-size:0.85rem;color:var(--accent2)">${card.eng}</div>
         </div>
       </div>`;
-    el.addEventListener('click', () => {
+    el.addEventListener('click', (e) => {
+      if (e.target.classList && e.target.classList.contains('speaker-btn')) {
+        e.stopPropagation();
+        speak(filteredCards[cardIndex].q);
+        return;
+      }
       if (el.dataset.depth === '0') flipTopCard();
     });
     container.appendChild(el);
   });
   cardIndex = 0;
   layoutDeck();
+  speakCurrentCard();
 }
 
 function layoutDeck() {
@@ -703,12 +754,14 @@ function nextCard() {
   if (filteredCards.length === 0) return;
   cardIndex = (cardIndex + 1) % filteredCards.length;
   layoutDeck();
+  speakCurrentCard();
 }
 
 function prevCard() {
   if (filteredCards.length === 0) return;
   cardIndex = (cardIndex - 1 + filteredCards.length) % filteredCards.length;
   layoutDeck();
+  speakCurrentCard();
 }
 
 function shuffleCards() {
@@ -982,6 +1035,10 @@ buildFilters('flashcard-filters', filterFlashcards);
 buildFilters('browse-filters', buildBrowse);
 buildDeck();
 buildBrowse('all');
+if ('speechSynthesis' in window) {
+  window.speechSynthesis.getVoices();
+  window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
+}
 </script>
 </body>
 </html>
